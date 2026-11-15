@@ -16,6 +16,8 @@ let package = Package(
     dependencies: [
         // >= 0.32.3: carries the fix for the half-precision split-K GEMM (mlx#3797 / #3810).
         .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.32.3"),
+        // The FLUX.2 autoencoder (Apache-2.0 weights), shared with Klein / Lens / ERNIE: encoder, decoder, bn stats.
+        .package(url: "https://github.com/xocialize/flux2-vae-mlx-swift", from: "0.8.0"),
     ],
     targets: [
         .target(
@@ -25,6 +27,7 @@ let package = Package(
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXFast", package: "mlx-swift"),
                 .product(name: "MLXRandom", package: "mlx-swift"),
+                .product(name: "Flux2VAE", package: "flux2-vae-mlx-swift"),
             ],
             path: "Sources/UltraTex"
         ),
@@ -44,6 +47,7 @@ let package = Package(
                 "UltraTex",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "Flux2VAE", package: "flux2-vae-mlx-swift"),
             ],
             path: "Sources/ultratex-gate"
         ),

@@ -3,6 +3,7 @@
 //   swift run -c release ultratex-bench --tokens 19174 [--text 512] [--size 9b|4b] [--stream bf16|fp32]
 //                                        [--attn dense|chunked] [--chunk-gb 4] [--passes 3]
 //                                        [--transformer <diffusers transformer dir> [--lora <dit_lora.safetensors>]]
+//                                        [--max-gb N]
 //
 // Without --transformer the weights are RANDOM (klein-9B-shaped, bf16): time and memory, not output. With it the
 // real DiT is loaded (and the LoRA merged), which also proves the loader; the inputs are still random. One pass is one
@@ -30,6 +31,10 @@ let chunkGB = Double(arg("chunk-gb", "4"))!
 let passes = Int(arg("passes", "3"))!
 
 let config: DiTConfig = size == "4b" ? .klein4B : .klein9B
+// Hard cap on MLX memory (see UltraTexMemory): by default the measured dense-attention peak for this token count
+// (about 17 GB resident + 0.26 GB per thousand tokens) plus 8 GB.
+let capGB = Double(arg("max-gb", String(format: "%.0f", 25 + 0.26 * Double(tokens) / 1000)))!
+UltraTexMemory.guardProcess(capGB: capGB, label: "ultratex-bench")
 AttentionUtils.backend = attn == "dense" ? .dense : .denseChunked(maxScoreBytes: Int(chunkGB * 1_073_741_824))
 
 func mb(_ bytes: Int) -> Double { (Double(bytes) / 1_048_576).rounded() }
