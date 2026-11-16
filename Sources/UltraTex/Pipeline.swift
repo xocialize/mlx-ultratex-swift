@@ -36,17 +36,38 @@ public struct UltraTexPipeline {
     public func run(mesh: UltraTexMesh, reference: UltraTexImage, resolution: Int, steps: Int = 25, seed: UInt64 = 42,
                     distance: Double = UltraTexRenderer.defaultDistance, noise: MLXArray? = nil,
                     onStep: ((Int) -> Void)? = nil) -> Output {
+        let t = Date()
+        let prepared = Self.prepare(mesh: mesh, reference: reference, resolution: resolution, distance: distance)
+        var out = run(prepared: prepared, steps: steps, seed: seed, noise: noise, onStep: onStep)
+        out.seconds["render and prepare"] = Date().timeIntervalSince(t) - out.seconds.values.reduce(0, +)
+        return out
+    }
+
+    /// The CPU half of a run: render the six normal maps and prepare what the model consumes. No model and no MLX
+    /// memory to speak of, so a caller can size the run (see `keptTokens`) before loading anything.
+    public static func prepare(mesh: UltraTexMesh, reference: UltraTexImage, resolution: Int,
+                               distance: Double = UltraTexRenderer.defaultDistance) -> UltraTexInputs.Prepared {
+        let views = UltraTexRenderer.normalMaps(mesh, size: 2048, distance: distance)
+            .map { UltraTexImage(width: $0.size, height: $0.size, rgba: $0.rgba) }
+        return UltraTexInputs.prepare(views: views, reference: reference, resolution: resolution)
+    }
+
+    /// Tokens the DiT will see for these inputs, without the 512 text tokens.
+    public static func keptTokens(_ prepared: UltraTexInputs.Prepared) -> Int {
+        UltraTexSampler.select(targetMask: prepared.canvasMask, normalsMask: prepared.canvasMask,
+                               referenceMask: prepared.referenceMask).keptCount
+    }
+
+    /// The model half: encode, sample, decode.
+    public func run(prepared: UltraTexInputs.Prepared, steps: Int = 25, seed: UInt64 = 42, noise: MLXArray? = nil,
+                    onStep: ((Int) -> Void)? = nil) -> Output {
+        let resolution = prepared.resolution
         var seconds: [String: Double] = [:]
         func timed<T>(_ name: String, _ body: () -> T) -> T {
             let t = Date()
             let out = body()
             seconds[name, default: 0] += Date().timeIntervalSince(t)
             return out
-        }
-        let prepared = timed("render and prepare") {
-            let views = UltraTexRenderer.normalMaps(mesh, size: 2048, distance: distance)
-                .map { UltraTexImage(width: $0.size, height: $0.size, rgba: $0.rgba) }
-            return UltraTexInputs.prepare(views: views, reference: reference, resolution: resolution)
         }
         let side = resolution / 16
         let sel = UltraTexSampler.select(targetMask: prepared.canvasMask, normalsMask: prepared.canvasMask,

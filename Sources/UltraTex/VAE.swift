@@ -1,6 +1,6 @@
 // The FLUX.2 autoencoder as UltraTex uses it: the stock encoder for the normal maps and the reference, and the
 // foreground-aware decoder UltraTex fine-tuned (converted to the diffusers layout by
-// DEV/UltraTexOracle/tools/convert_decoder.py). Each view is encoded and decoded on its own, as upstream does.
+// Tools/convert_decoder.py). Each view is encoded and decoded on its own, as upstream does.
 // The network itself is the fleet's Flux2VAE package; this file only adapts layouts.
 //
 // Every call goes through that package's row-band path. Untiled, one 2048² view costs a 17 GB attention score

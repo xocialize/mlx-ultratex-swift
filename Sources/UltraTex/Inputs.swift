@@ -141,6 +141,42 @@ public enum UltraTexInputs {
         stride(from: index, to: interleaved.count, by: channels).map { interleaved[$0] }
     }
 
+    // MARK: The reference picture
+
+    public enum ReferenceError: Error, CustomStringConvertible {
+        case noAlpha
+        public var description: String {
+            "the reference picture has no transparent background; UltraTex needs the object cut out (an RGBA picture)"
+        }
+    }
+
+    /// The reference as the oracle's inputs had it: cropped to its alpha, centred on a transparent square with a
+    /// margin (DEV/UltraTexOracle/tools/render_gbuffer.py `square_reference`). `picture` has straight alpha.
+    public static func squareReference(_ picture: UltraTexImage, margin: Double = 0.06) throws -> UltraTexImage {
+        var (minX, minY, maxX, maxY) = (picture.width, picture.height, -1, -1)
+        var transparent = 0
+        for y in 0 ..< picture.height {
+            for x in 0 ..< picture.width {
+                if picture.rgba[(y * picture.width + x) * 4 + 3] > 0 {
+                    minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+                } else {
+                    transparent += 1
+                }
+            }
+        }
+        guard maxX >= 0, transparent > 0 else { throw ReferenceError.noAlpha }
+        let (w, h) = (maxX - minX + 1, maxY - minY + 1)
+        let side = Int((Double(max(w, h)) * (1 + 2 * margin)).rounded(.toNearestOrEven))
+        var rgba = [UInt8](repeating: 255, count: side * side * 4)
+        for p in 0 ..< side * side { rgba[p * 4 + 3] = 0 }
+        let (ox, oy) = ((side - w) / 2, (side - h) / 2)
+        for y in 0 ..< h {
+            let from = ((minY + y) * picture.width + minX) * 4, to = ((oy + y) * side + ox) * 4
+            rgba.replaceSubrange(to ..< (to + w * 4), with: picture.rgba[from ..< (from + w * 4)])
+        }
+        return UltraTexImage(width: side, height: side, rgba: rgba)
+    }
+
     // MARK: What the pipeline consumes
 
     public struct Prepared {

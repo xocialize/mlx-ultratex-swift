@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "UltraTex", targets: ["UltraTex"]),
         .executable(name: "ultratex-bench", targets: ["ultratex-bench"]),
         .executable(name: "ultratex-gate", targets: ["ultratex-gate"]),
+        .executable(name: "ultratex-texture", targets: ["ultratex-texture"]),
     ],
     dependencies: [
         // >= 0.32.3: carries the fix for the half-precision split-K GEMM (mlx#3797 / #3810).
@@ -50,6 +51,14 @@ let package = Package(
                 .product(name: "Flux2VAE", package: "flux2-vae-mlx-swift"),
             ],
             path: "Sources/ultratex-gate"
+        ),
+        .executableTarget(
+            name: "ultratex-texture",          // not "ultratex": target names clash with `UltraTex` regardless of case
+            dependencies: [
+                "UltraTex",
+                .product(name: "MLX", package: "mlx-swift"),
+            ],
+            path: "Sources/ultratex-texture"
         ),
     ]
 )

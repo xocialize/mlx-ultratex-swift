@@ -24,6 +24,8 @@
 //           --golden-png <result.png>]: a whole run from a mesh and a picture. With --golden the run starts from
 //           the golden's noise and the picture is compared with the CUDA run's; without it the noise comes
 //           from --seed and there is nothing to compare with.
+//   reference  --picture <matted.png> --item <stage item dir>: the picture cropped to its alpha and squared in
+//           Swift against the item's reference.png, which tools/render_gbuffer.py made.
 //   bake    --glb <mesh.glb> --views <2x3 canvas png> [--distance 1.6] [--atlas 2048] [--out-glb <file>]
 //           [--out-atlas <png>] [--turn <png>] [--python-atlas <dir with atlas.png and coverage.png>]: no model.
 //           The six views onto the mesh's texture with a fill, a GLB out, a turnaround sheet (the old texture
@@ -53,7 +55,7 @@ func arg(_ name: String, _ fallback: String) -> String {
 let mode = arg("mode", "step")
 // A hard cap on this process's MLX memory (see UltraTexMemory). The defaults cover the measured peaks with room:
 // 22 GB for a 1024² sampling run, under 10 GB for the autoencoder.
-let capGB = Double(arg("max-gb", ["vae", "select", "render", "inputs", "bake"].contains(mode) ? "16" : "32"))!
+let capGB = Double(arg("max-gb", ["vae", "select", "render", "inputs", "bake", "reference"].contains(mode) ? "16" : "32"))!
 let availableGB = UltraTexMemory.guardProcess(capGB: capGB, label: "ultratex-gate")
 FileHandle.standardError.write("memory: \(String(format: "%.0f", availableGB)) GB available, cap \(Int(capGB)) GB\n".data(using: .utf8)!)
 let golden = URL(fileURLWithPath: arg("golden", ""))
@@ -238,6 +240,22 @@ if mode == "pipeline" {
     report("pipeline: \(URL(fileURLWithPath: arg("glb", "")).deletingLastPathComponent().lastPathComponent) at \(resolution)², "
            + "\(hasGolden ? "the golden's noise" : "seed \(arg("seed", "42"))"), load \(String(format: "%.1f", loadSeconds)) s, "
            + "run \(String(format: "%.0f", total)) s")
+    exit(0)
+}
+
+if mode == "reference" {
+    let ours = try UltraTexInputs.squareReference(try UltraTexImage.loadStraight(arg("picture", "")))
+    let theirs = try UltraTexImage.loadStraight(arg("item", "") + "/reference.png")
+    var differ = 0
+    if ours.width == theirs.width && ours.height == theirs.height {
+        for p in 0 ..< ours.width * ours.height {
+            let (a, b) = (ours.rgba[p * 4 + 3], theirs.rgba[p * 4 + 3])
+            if a != b || (a > 0 && ours.rgba[(p * 4) ..< (p * 4 + 3)] != theirs.rgba[(p * 4) ..< (p * 4 + 3)]) { differ += 1 }
+        }
+    }
+    rows.append(("size", "\(ours.width)x\(ours.height) (python \(theirs.width)x\(theirs.height))"))
+    rows.append(("pixels", ours.width == theirs.width ? (differ == 0 ? "identical" : "\(differ) differ") : "SIZE DIFFERS"))
+    report("reference squaring: \(URL(fileURLWithPath: arg("picture", "")).lastPathComponent)")
     exit(0)
 }
 

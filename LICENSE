@@ -20,5 +20,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-The FLUX.2-klein-4B model weights are licensed by Black Forest Labs under Apache-2.0;
-this MIT license covers only the Swift/MLX port code in this repository.
+This MIT license covers only the Swift/MLX code in this repository. It ships no model weights.
+The weights it runs are not permissive: FLUX.2 klein base 9B is licensed by Black Forest Labs under
+the FLUX Non-Commercial License v2.1, and the UltraTex LoRA and decoder are fine-tuned from it.
+See THIRD_PARTY_LICENSES.md.

@@ -27,6 +27,16 @@ public enum UltraTexMemory {
         return pages * Int(sysconf(_SC_PAGESIZE))
     }
 
+    /// The largest physical footprint this process has had, in bytes (what Activity Monitor calls Memory, at its
+    /// peak): the figure a lane is charged by.
+    public static func peakFootprintBytes() -> Int {
+        var info = rusage_info_v4()
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(getpid(), RUSAGE_INFO_V4, $0) }
+        }
+        return result == 0 ? Int(info.ri_lifetime_max_phys_footprint) : 0
+    }
+
     /// Call once, before any model is built. Refuses to start (exit 75) unless the machine has `capGB` plus a
     /// 16 GB margin available, bounds MLX's buffer cache, and starts the watchdog. Returns the available GB seen.
     @discardableResult

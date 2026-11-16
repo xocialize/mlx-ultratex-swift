@@ -70,6 +70,8 @@ public enum UltraTexWeights {
     }
 
     static func loadShards(_ directory: URL) throws -> [String: MLXArray] {
+        // A models folder is often a folder of symlinks into a download cache; list the real directory.
+        let directory = directory.resolvingSymlinksInPath()
         let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "safetensors" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
