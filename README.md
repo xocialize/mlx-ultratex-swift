@@ -22,7 +22,8 @@ against a CUDA oracle. There is no engine package or plugin yet.**
   nearest painted surface, pads the charts and writes a GLB with only the base-colour image changed (AB-R-0897).
 - `ultratex-texture` runs the whole job: mesh and picture in, textured GLB out. Measured on four more corpus
   items at 1024² (4 to 7 minutes, 27 to 31 GB) and on the shoes at 2048² (31 minutes, 40 GB); see "Runs" below.
-- Known limit: at 1024² the result depends on the seed for light-coloured objects. See "Seeds" below.
+- Known limit: at 1024² the result depends on the seed. Of fifteen runs (five items, three seeds), four have
+  visibly wrong colour on the sides or back, and no seed is right on all five items. See "Seeds" below.
 - Not started: the engine package and the plugin.
 
 **Licence posture (AB-D-0231):** a Gaea plugin only. The 9B base and the UltraTex LoRAs are under BFL's FLUX
@@ -43,7 +44,8 @@ swift run -c release ultratex-texture --glb mesh.glb --reference picture.png --o
 - `--resolution` is the size of each of the six generated views. 1024 takes four to seven minutes on an M5 Max
   and 27 to 31 GB of memory; 2048 takes half an hour to an hour and 40 GB or more (dense attention).
 - `--seed` picks the starting noise. It is MLX's noise, so a seed does not reproduce upstream's picture for the
-  same number. If a light-coloured object comes out flat or grey at 1024², try another seed or 2048².
+  same number. At 1024² about one run in four puts wrong colour on the sides or back: write `--views`, look at
+  it, and if it is wrong try another seed or 2048².
 - Only the base-colour texture is replaced. Roughness/metallic is left as the mesh had it.
 
 The models folder holds four things, none of them in this repository:
@@ -153,7 +155,7 @@ from. Other sessions were using the machine during some runs, so times are upper
 |---|---|---|---|---|---|---|---|
 | shoes | 1024² | 15,882 | 222 s | 246 s | 21.5 GB | 27.2 GB | 21 % |
 | hair | 1024² | 17,010 | 278 s | 309 s | 22.1 GB | 27.8 GB | 33 % |
-| dress (gate run, AB-R-0896) | 1024² | 19,174 | 288 s | 310 s | 22.4 GB | 29 GB | 64 % |
+| dress | 1024² | 19,174 | 332 s | 359 s | 22.4 GB | 29.0 GB | 64 % |
 | skirt | 1024² | 22,904 | 385 s | 407 s | 23.3 GB | 30.3 GB | 76 % |
 | top | 1024² | 24,738 | 415 s | 437 s | 23.8 GB | 30.9 GB | 71 % |
 | shoes | 2048² | 57,237 | 1,804 s | 1,866 s | 32.3 GB | 39.6 GB | 21 % |
@@ -163,23 +165,44 @@ The rest of the atlas is filled from the nearest painted surface. Loading takes 
 
 ## Seeds
 
-At 1024² the result on light-coloured objects depends on the starting noise. With seed 42 the white shoes came
-out flat grey with stray orange strokes and the light-blue top came out flat and too dark; with seeds 7 and 123
-the shoes are white and with seed 7 the top has its colours. The dark items (dress, hair, skirt) were right
-with seed 42. At 2048² the shoes are white and clean with seed 42. Upstream on CUDA at 1024² with its own
-seed-42 noise also gave white shoes, so this is the draw and not the port: one DiT pass on the shoes' 2048²
-golden inputs matches CUDA's block-sparse velocity at cosine 0.993 and 0.991 (steps 12 and 24), where CUDA's
-own dense and sparse passes differ by 0.9975 at step 0 on the dress.
+At 1024² the result depends on the starting noise, and no seed tried is right on every item. All five corpus
+items were run with seeds 42, 7 and 123:
 
-Mean lightness L of the sides and back, against the reference picture's:
+| Item | Seed 42 | Seed 7 | Seed 123 |
+|---|---|---|---|
+| dress (black) | right | grey panels on the sides and back | white panels on the sides and back |
+| hair (black) | right | right | right |
+| skirt (navy) | right, a little dark | right | right |
+| shoes (white) | flat grey, stray orange strokes | white | white, a stray black mark on the side |
+| top (light blue) | flat and too dark | right, the underside too bright | right |
+
+So seed 42 is wrong on the two light items and seeds 7 and 123 are wrong on the black dress. The default stays
+42: no other seed is better across the five. On the dress the front view is right with all three seeds and only
+the sides the reference picture does not show go wrong. On the shoes and the top with seed 42 the whole object
+is off, the front included.
+
+Mean lightness L (CIE Lab) of the sides and back, against the reference picture's:
 
 | Item | Reference | Seed 42 | Seed 7 | Seed 123 | CUDA |
 |---|---|---|---|---|---|
+| dress 1024² | 12.1 | 11.8 | 24.0 | 37.8 | |
+| hair 1024² | 8.7 | 0.2 | 0.1 | 2.6 | |
+| skirt 1024² | 17.0 | 7.7 | 12.8 | 19.3 | |
 | shoes 1024² | 80.2 | 72.4 | 85.6 | 85.4 | 80.2 (1024² dense) |
+| top 1024² | 71.9 | 64.9 | 73.7 | 74.1 | 74.4 (2048² sparse) |
 | shoes 2048² | 80.2 | 87.6 | | | 81.9 (2048² dense) |
-| top 1024² | 71.9 | 64.9 | 73.7 | | 74.4 (2048² sparse) |
 
-Seed 7 has not been run on the dark items, so the default stays 42 for now.
+The hair reads darker than its reference in every run because the reference picture has highlights and the
+generated albedo has none.
+
+This is the draw and not the port. Started from the CUDA run's own noise, the dress at 1024² matches the CUDA
+picture to 44.0 dB. One DiT pass on the shoes' 2048² golden inputs matches CUDA's block-sparse velocity at
+cosine 0.993 and 0.991 (steps 12 and 24), where CUDA's own dense and sparse passes differ by 0.9975 at step 0 on
+the dress. Upstream's CUDA noise cannot be reproduced on a Mac, so whether upstream is as sensitive at 1024² is
+not known: there are only two CUDA runs at that size (dress and shoes, both right).
+
+At 2048² the shoes are white and clean with seed 42. That is the only 2048² run on the Mac, so whether the
+larger size removes the sensitivity is not established.
 
 ## Plan
 
